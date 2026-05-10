@@ -19,15 +19,12 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('mprFromDate').valueAsDate = firstDay;
     document.getElementById('mprToDate').valueAsDate = today;
 
-    // Set default dates for Disposal MPR (first day of current month to today)
     const disposalMprFrom = document.getElementById('disposalMprFromDate');
     const disposalMprTo = document.getElementById('disposalMprToDate');
     if (disposalMprFrom) disposalMprFrom.valueAsDate = firstDay;
     if (disposalMprTo) disposalMprTo.valueAsDate = today;
 
-    // Show loaded data counts
     updateLoadedCounts();
-
     refreshAll();
 });
 
@@ -48,6 +45,7 @@ function showTab(tabId) {
 function saveData() {
     localStorage.setItem('rccms_registrations', JSON.stringify(registrations));
     localStorage.setItem('rccms_disposals', JSON.stringify(disposals));
+    console.log("Data saved: Registrations=" + registrations.length + ", Disposals=" + disposals.length);
 }
 
 function showToast(message, type = 'success') {
@@ -134,14 +132,12 @@ function renderRegistrations() {
     }).join('');
 }
 
-function filterRegistrations() {
-    renderRegistrations();
-}
+function filterRegistrations() { renderRegistrations(); }
 
 // ===================== DISPOSAL =====================
 function updateDisposalDropdown() {
     const select = document.getElementById('dispRRCMS');
-    const pending = registrations.filter(r => !disposals.find(d => d.rrcms === r.rrcms));
+    const pending = getPendingFiles(); // use getPendingFiles to ensure only undiposed appear
     select.innerHTML = '<option value="">Select RRCMS Number</option>' + 
         pending.map(r => `<option value="${r.rrcms}">${r.rrcms} - ${r.stream}</option>`).join('');
 }
@@ -157,9 +153,7 @@ function searchFilesToDispose() {
         return;
     }
 
-    // Search in ALL registered files (both pending and disposed)
     const matchedFiles = registrations.filter(r => {
-        const isDisposed = disposals.find(d => d.rrcms === r.rrcms);
         return (
             r.rrcms.toLowerCase().includes(searchTerm) ||
             r.stream.toLowerCase().includes(searchTerm) ||
@@ -167,7 +161,7 @@ function searchFilesToDispose() {
             (r.applicant && r.applicant.toLowerCase().includes(searchTerm)) ||
             (r.village && r.village.toLowerCase().includes(searchTerm))
         );
-    }).slice(0, 20); // Show max 20 results
+    }).slice(0, 20);
 
     if (matchedFiles.length === 0) {
         resultsDiv.innerHTML = '<div class="no-results">❌ No files found matching your search</div>';
@@ -177,14 +171,13 @@ function searchFilesToDispose() {
 
     resultsDiv.innerHTML = matchedFiles.map(r => {
         const isDisposed = disposals.find(d => d.rrcms === r.rrcms);
-        const statusClass = isDisposed ? 'status-disposed' : 'status-pending';
         const statusText = isDisposed ? '✅ Disposed' : '⏳ Pending';
         const clickAction = isDisposed ? '' : `onclick="selectFileForDisposal('${r.rrcms}')"`;
         const cursorStyle = isDisposed ? 'cursor: not-allowed; opacity: 0.6;' : 'cursor: pointer;';
         const highlightRRCMS = highlightText(r.rrcms, searchTerm);
         const highlightStream = highlightText(r.stream, searchTerm);
 
-        return `<div class="search-result-item ${isDisposed ? '' : ''}" ${clickAction} style="${cursorStyle}">
+        return `<div class="search-result-item" ${clickAction} style="${cursorStyle}">
             <div>
                 <div class="rrcms-num">${highlightRRCMS}</div>
                 <div class="file-info">
@@ -193,7 +186,7 @@ function searchFilesToDispose() {
                     ${r.village ? '| Village: ' + r.village : ''}
                 </div>
             </div>
-            <span class="status-badge ${statusClass}">${statusText}</span>
+            <span class="status-badge">${statusText}</span>
         </div>`;
     }).join('');
 
@@ -210,27 +203,19 @@ function selectFileForDisposal(rrcms) {
     const file = registrations.find(r => r.rrcms === rrcms);
     if (!file) return;
 
-    // Check if already disposed
     if (disposals.find(d => d.rrcms === rrcms)) {
         showToast('This file is already disposed!', 'error');
         return;
     }
 
-    // Set the dropdown value
     const select = document.getElementById('dispRRCMS');
     select.value = rrcms;
-
-    // Trigger the onchange event
     loadFileDetails();
 
-    // Clear search results
     document.getElementById('disposeSearch').value = '';
     document.getElementById('searchResults').style.display = 'none';
-
-    // Show success message
     showToast(`File ${rrcms} selected for disposal`);
 
-    // Scroll to disposal form
     document.getElementById('fileDetails').scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
@@ -275,6 +260,7 @@ function disposeFile() {
         return;
     }
 
+    // Add new disposal
     disposals.push({
         rrcms: rrcms,
         stream: file.stream,
@@ -288,12 +274,13 @@ function disposeFile() {
     saveData();
     showToast('File disposed successfully!');
 
+    // Clear form
     document.getElementById('dispRRCMS').value = '';
     document.getElementById('dispType').value = '';
     document.getElementById('dispRemarks').value = '';
     document.getElementById('fileDetails').style.display = 'none';
 
-    refreshAll();
+    refreshAll();  // This will also update the pending count
 }
 
 function renderDisposals() {
@@ -336,9 +323,7 @@ function undoDisposal(rrcms) {
     refreshAll();
 }
 
-function filterDisposals() {
-    renderDisposals();
-}
+function filterDisposals() { renderDisposals(); }
 
 // ===================== PENDING FILES =====================
 function getAgeCategory(days) {
@@ -355,6 +340,7 @@ function getAgeCategory(days) {
 }
 
 function getPendingFiles() {
+    // Strict comparison – only files not present in disposals
     return registrations.filter(r => !disposals.find(d => d.rrcms === r.rrcms));
 }
 
@@ -404,9 +390,7 @@ function renderPending() {
     }
 }
 
-function filterPending() {
-    renderPending();
-}
+function filterPending() { renderPending(); }
 
 function updateFilters() {
     const streams = [...new Set(registrations.map(r => r.stream))].sort();
@@ -428,14 +412,12 @@ function updateFilters() {
 function exportPendingCSV() {
     const pending = getPendingFiles();
     const today = new Date();
-
     let csv = 'S.No.,RRCMS No.,Reg Date,Stream (Dhara),Reg Year,Pending Days,Age Category,Applicant,Village\n';
     pending.forEach((r, i) => {
         const days = Math.ceil((today - new Date(r.regDate)) / (1000 * 60 * 60 * 24));
         const age = getAgeCategory(days);
         csv += `${i+1},${r.rrcms},${r.regDate},${r.stream},${r.regYear},${days},"${age.label}","${r.applicant || ''}","${r.village || ''}"\n`;
     });
-
     downloadCSV(csv, 'Pending_Files_Report.csv');
     showToast('Pending files exported successfully!');
 }
@@ -444,14 +426,9 @@ function exportPendingCSV() {
 function generateMPR() {
     const fromDate = new Date(document.getElementById('mprFromDate').value);
     const toDate = new Date(document.getElementById('mprToDate').value);
-
-    if (!fromDate || !toDate) {
-        showToast('Please select both From and To dates!', 'error');
-        return;
-    }
+    if (!fromDate || !toDate) { showToast('Please select both From and To dates!', 'error'); return; }
 
     const officeName = "Assistant Collector (Fastrack), Niwai";
-
     const initialPending = registrations.filter(r => {
         const regDate = new Date(r.regDate);
         if (regDate >= fromDate) return false;
@@ -478,10 +455,9 @@ function generateMPR() {
         return new Date(disp.disposalDate) > toDate;
     });
 
-    const ageBreakup = { '0-6': 0, '6-12': 0, '12-24': 0, '24-36': 0, '36-60': 0, '60-120': 0, '120-240': 0, '240-360': 0, '360-480': 0, '480+': 0 };
-
+    const ageBreakup = { '0-6':0, '6-12':0, '12-24':0, '24-36':0, '36-60':0, '60-120':0, '120-240':0, '240-360':0, '360-480':0, '480+':0 };
     pendingAsOn.forEach(r => {
-        const days = Math.ceil((toDate - new Date(r.regDate)) / (1000 * 60 * 60 * 24));
+        const days = Math.ceil((toDate - new Date(r.regDate)) / (1000*60*60*24));
         if (days <= 180) ageBreakup['0-6']++;
         else if (days <= 365) ageBreakup['6-12']++;
         else if (days <= 730) ageBreakup['12-24']++;
@@ -502,60 +478,39 @@ function generateMPR() {
         <td>${newRegistered}</td>
         <td>${totalDecided}</td>
         <td style="font-weight:700;color:#e53e3e;">${pendingAsOn.length}</td>
-        <td>${ageBreakup['0-6']}</td>
-        <td>${ageBreakup['6-12']}</td>
-        <td>${ageBreakup['12-24']}</td>
-        <td>${ageBreakup['24-36']}</td>
-        <td>${ageBreakup['36-60']}</td>
-        <td>${ageBreakup['60-120']}</td>
-        <td>${ageBreakup['120-240']}</td>
-        <td>${ageBreakup['240-360']}</td>
-        <td>${ageBreakup['360-480']}</td>
-        <td>${ageBreakup['480+']}</td>
+        <td>${ageBreakup['0-6']}</td><td>${ageBreakup['6-12']}</td><td>${ageBreakup['12-24']}</td>
+        <td>${ageBreakup['24-36']}</td><td>${ageBreakup['36-60']}</td><td>${ageBreakup['60-120']}</td>
+        <td>${ageBreakup['120-240']}</td><td>${ageBreakup['240-360']}</td><td>${ageBreakup['360-480']}</td><td>${ageBreakup['480+']}</td>
     </tr>`;
-
     showToast('MPR Report generated successfully!');
 }
 
 function exportMPRCSV() {
     const tbody = document.getElementById('mprTableBody');
-    if (!tbody.innerHTML.trim()) {
-        showToast('Please generate MPR first!', 'error');
-        return;
-    }
-
+    if (!tbody.innerHTML.trim()) { showToast('Please generate MPR first!', 'error'); return; }
     const fromDate = document.getElementById('mprFromDate').value;
     const toDate = document.getElementById('mprToDate').value;
-
     let csv = `MPR Report - ${fromDate} to ${toDate}\n\n`;
     csv += 'S.No.,Office Name,Initial Pending,New Registered,Total Decided,Pending As On Date,Upto 6 Months,6 Months To 1 year,1 To 2 Years,2 To 3 Years,3 To 5 Years,5 To 10 Years,10 To 20 Years,20 To 30 Years,30 To 40 Years,More Than 40 Years\n';
-
     const rows = tbody.querySelectorAll('tr');
     rows.forEach(row => {
         const cells = row.querySelectorAll('td');
         const values = Array.from(cells).map(c => c.textContent.trim());
         csv += values.join(',') + '\n';
     });
-
     downloadCSV(csv, `MPR_Report_${fromDate}_to_${toDate}.csv`);
     showToast('MPR exported successfully!');
 }
 
-// ===================== DISPOSAL MPR (NEW) =====================
+// ===================== DISPOSAL MPR =====================
 function generateDisposalMPR() {
     const fromDate = document.getElementById('disposalMprFromDate').value;
     const toDate = document.getElementById('disposalMprToDate').value;
-
-    if (!fromDate || !toDate) {
-        showToast('Please select both From and To dates!', 'error');
-        return;
-    }
+    if (!fromDate || !toDate) { showToast('Please select both From and To dates!', 'error'); return; }
 
     const from = new Date(fromDate);
     const to = new Date(toDate);
-    to.setHours(23, 59, 59, 999);
-
-    // Filter disposals within date range
+    to.setHours(23,59,59,999);
     const filteredDisposals = disposals.filter(d => {
         const dispDate = new Date(d.disposalDate);
         return dispDate >= from && dispDate <= to;
@@ -567,96 +522,68 @@ function generateDisposalMPR() {
         return;
     }
 
-    // Calculate pending days for each disposal
     const disposalsWithDays = filteredDisposals.map(d => {
-        const days = Math.ceil((new Date(d.disposalDate) - new Date(d.regDate)) / (1000 * 60 * 60 * 24));
+        const days = Math.ceil((new Date(d.disposalDate) - new Date(d.regDate)) / (1000*60*60*24));
         let category = '';
         if (days < 365) category = '<1 Year';
-        else if (days >= 365 && days < 730) category = '1-2 Years';
-        else if (days >= 730 && days < 1095) category = '2-3 Years';
-        else if (days >= 1095 && days < 1825) category = '3-5 Years';
+        else if (days >=365 && days<730) category = '1-2 Years';
+        else if (days >=730 && days<1095) category = '2-3 Years';
+        else if (days >=1095 && days<1825) category = '3-5 Years';
         else category = '≥5 Years';
         return { ...d, pendingDays: days, category };
     });
 
     const total = disposalsWithDays.length;
     const lessThan1Year = disposalsWithDays.filter(d => d.pendingDays < 365).length;
-    const oneToTwo = disposalsWithDays.filter(d => d.pendingDays >= 365 && d.pendingDays < 730).length;
-    const twoToThree = disposalsWithDays.filter(d => d.pendingDays >= 730 && d.pendingDays < 1095).length;
-    const threeToFive = disposalsWithDays.filter(d => d.pendingDays >= 1095 && d.pendingDays < 1825).length;
-    const overFive = disposalsWithDays.filter(d => d.pendingDays >= 1825).length;
-
+    const oneToTwo = disposalsWithDays.filter(d => d.pendingDays >=365 && d.pendingDays<730).length;
+    const twoToThree = disposalsWithDays.filter(d => d.pendingDays >=730 && d.pendingDays<1095).length;
+    const threeToFive = disposalsWithDays.filter(d => d.pendingDays >=1095 && d.pendingDays<1825).length;
+    const overFive = disposalsWithDays.filter(d => d.pendingDays >=1825).length;
     const overOneYear = total - lessThan1Year;
     const overTwoYears = total - (lessThan1Year + oneToTwo);
     const overThreeYears = total - (lessThan1Year + oneToTwo + twoToThree);
     const overFiveYears = overFive;
 
-    // Update summary table
-    const summaryBody = document.getElementById('disposalMprTableBody');
-    summaryBody.innerHTML = `<tr style="font-weight: bold; background: #f7fafc;">
-        <td>${total}</td>
-        <td>${lessThan1Year}</td>
-        <td>${oneToTwo}</td>
-        <td>${twoToThree}</td>
-        <td>${threeToFive}</td>
-        <td>${overFive}</td>
-        <td>${overOneYear}</td>
-        <td>${overTwoYears}</td>
-        <td>${overThreeYears}</td>
-        <td>${overFiveYears}</td>
+    document.getElementById('disposalMprTableBody').innerHTML = `<tr style="font-weight: bold; background: #f7fafc;">
+        <td>${total}</td><td>${lessThan1Year}</td><td>${oneToTwo}</td><td>${twoToThree}</td><td>${threeToFive}</td>
+        <td>${overFive}</td><td>${overOneYear}</td><td>${overTwoYears}</td><td>${overThreeYears}</td><td>${overFiveYears}</td>
     </tr>`;
 
-    // Detailed list
     const detailBody = document.getElementById('disposalDetailBody');
     detailBody.innerHTML = disposalsWithDays.map((d, idx) => `
-        <tr>
-            <td>${idx + 1}</td>
-            <td>${d.rrcms}</td>
-            <td>${d.stream}</td>
-            <td>${formatDate(d.regDate)}</td>
-            <td>${formatDate(d.disposalDate)}</td>
-            <td>${d.pendingDays} days</td>
-            <td>${d.category}</td>
-        </tr>
+        <tr><td>${idx+1}</td><td>${d.rrcms}</td><td>${d.stream}</td><td>${formatDate(d.regDate)}</td><td>${formatDate(d.disposalDate)}</td><td>${d.pendingDays} days</td><td>${d.category}</td></tr>
     `).join('');
-
     showToast(`Disposal MPR generated: ${total} disposals found.`);
 }
 
 function exportDisposalMPRCSV() {
     const fromDate = document.getElementById('disposalMprFromDate').value;
     const toDate = document.getElementById('disposalMprToDate').value;
-    if (!fromDate || !toDate) {
-        showToast('Please generate report first!', 'error');
-        return;
-    }
+    if (!fromDate || !toDate) { showToast('Please generate report first!', 'error'); return; }
 
-    // Fetch data from table (simpler to recompute)
     const from = new Date(fromDate);
     const to = new Date(toDate);
-    to.setHours(23, 59, 59, 999);
+    to.setHours(23,59,59,999);
     const filteredDisposals = disposals.filter(d => {
         const dispDate = new Date(d.disposalDate);
         return dispDate >= from && dispDate <= to;
     });
-
     const disposalsWithDays = filteredDisposals.map(d => {
-        const days = Math.ceil((new Date(d.disposalDate) - new Date(d.regDate)) / (1000 * 60 * 60 * 24));
+        const days = Math.ceil((new Date(d.disposalDate) - new Date(d.regDate)) / (1000*60*60*24));
         let category = '';
         if (days < 365) category = '<1 Year';
-        else if (days >= 365 && days < 730) category = '1-2 Years';
-        else if (days >= 730 && days < 1095) category = '2-3 Years';
-        else if (days >= 1095 && days < 1825) category = '3-5 Years';
+        else if (days >=365 && days<730) category = '1-2 Years';
+        else if (days >=730 && days<1095) category = '2-3 Years';
+        else if (days >=1095 && days<1825) category = '3-5 Years';
         else category = '≥5 Years';
         return { ...d, pendingDays: days, category };
     });
-
     const total = disposalsWithDays.length;
     const lessThan1Year = disposalsWithDays.filter(d => d.pendingDays < 365).length;
-    const oneToTwo = disposalsWithDays.filter(d => d.pendingDays >= 365 && d.pendingDays < 730).length;
-    const twoToThree = disposalsWithDays.filter(d => d.pendingDays >= 730 && d.pendingDays < 1095).length;
-    const threeToFive = disposalsWithDays.filter(d => d.pendingDays >= 1095 && d.pendingDays < 1825).length;
-    const overFive = disposalsWithDays.filter(d => d.pendingDays >= 1825).length;
+    const oneToTwo = disposalsWithDays.filter(d => d.pendingDays >=365 && d.pendingDays<730).length;
+    const twoToThree = disposalsWithDays.filter(d => d.pendingDays >=730 && d.pendingDays<1095).length;
+    const threeToFive = disposalsWithDays.filter(d => d.pendingDays >=1095 && d.pendingDays<1825).length;
+    const overFive = disposalsWithDays.filter(d => d.pendingDays >=1825).length;
     const overOneYear = total - lessThan1Year;
     const overTwoYears = total - (lessThan1Year + oneToTwo);
     const overThreeYears = total - (lessThan1Year + oneToTwo + twoToThree);
@@ -665,12 +592,10 @@ function exportDisposalMPRCSV() {
     let csv = `Disposal MPR,${fromDate} to ${toDate}\n\n`;
     csv += `Total Disposals,<1 Year,1-2 Years,2-3 Years,3-5 Years,≥5 Years,Over 1 Year,Over 2 Years,Over 3 Years,Over 5 Years\n`;
     csv += `${total},${lessThan1Year},${oneToTwo},${twoToThree},${threeToFive},${overFive},${overOneYear},${overTwoYears},${overThreeYears},${overFiveYears}\n\n`;
-    csv += `Detailed Disposals List\n`;
-    csv += `S.No.,RRCMS No.,Stream,Reg Date,Disposal Date,Pending Days,Age Category\n`;
+    csv += `Detailed Disposals List\nS.No.,RRCMS No.,Stream,Reg Date,Disposal Date,Pending Days,Age Category\n`;
     disposalsWithDays.forEach((d, idx) => {
         csv += `${idx+1},${d.rrcms},${d.stream},${d.regDate},${d.disposalDate},${d.pendingDays},${d.category}\n`;
     });
-
     downloadCSV(csv, `Disposal_MPR_${fromDate}_to_${toDate}.csv`);
     showToast('Disposal MPR exported successfully!');
 }
@@ -682,17 +607,17 @@ function updateDashboard() {
 
     document.getElementById('totalFiles').textContent = registrations.length;
     document.getElementById('disposedFiles').textContent = disposals.length;
-    document.getElementById('pendingFiles').textContent = getPendingFiles().length;
+    const pendingCount = registrations.length - disposals.length;
+    document.getElementById('pendingFiles').textContent = pendingCount;
 
     const pendingOver5 = getPendingFiles().filter(r => {
-        const days = Math.ceil((today - new Date(r.regDate)) / (1000 * 60 * 60 * 24));
+        const days = Math.ceil((today - new Date(r.regDate)) / (1000*60*60*24));
         return days > 1825;
     }).length;
     document.getElementById('pendingOver5Yrs').textContent = pendingOver5;
 
     const todayReg = registrations.filter(r => r.regDate === todayStr).length;
     document.getElementById('todayRegistered').textContent = todayReg;
-
     const todayDisp = disposals.filter(d => d.disposalDate === todayStr).length;
     document.getElementById('todayDisposed').textContent = todayDisp;
 
@@ -700,25 +625,18 @@ function updateDashboard() {
 
     // Age analysis
     const pending = getPendingFiles();
-    const ageCounts = { 'Upto 6 Months': 0, '6 Months - 1 Year': 0, '1 - 2 Years': 0, '2 - 3 Years': 0, '3 - 5 Years': 0, '5 - 10 Years': 0, '10 - 20 Years': 0, '20 - 30 Years': 0, '30 - 40 Years': 0, 'More Than 40 Years': 0 };
-    const ageColors = ['#48bb78', '#ecc94b', '#ed8936', '#ed8936', '#e53e3e', '#e53e3e', '#805ad5', '#805ad5', '#718096', '#718096'];
-
+    const ageCounts = { 'Upto 6 Months':0, '6 Months - 1 Year':0, '1 - 2 Years':0, '2 - 3 Years':0, '3 - 5 Years':0, '5 - 10 Years':0, '10 - 20 Years':0, '20 - 30 Years':0, '30 - 40 Years':0, 'More Than 40 Years':0 };
+    const ageColors = ['#48bb78','#ecc94b','#ed8936','#ed8936','#e53e3e','#e53e3e','#805ad5','#805ad5','#718096','#718096'];
     pending.forEach(r => {
-        const days = Math.ceil((today - new Date(r.regDate)) / (1000 * 60 * 60 * 24));
+        const days = Math.ceil((today - new Date(r.regDate)) / (1000*60*60*24));
         const age = getAgeCategory(days);
         ageCounts[age.label]++;
     });
-
     const totalPending = pending.length || 1;
     const ageBody = document.getElementById('ageAnalysisBody');
     ageBody.innerHTML = Object.entries(ageCounts).map(([label, count], i) => {
         const pct = ((count / totalPending) * 100).toFixed(1);
-        return `<tr>
-            <td>${label}</td>
-            <td style="font-weight:700;">${count}</td>
-            <td>${pct}%</td>
-            <td style="width:200px;"><div class="age-bar"><div class="age-fill" style="width:${pct}%;background:${ageColors[i]}"></div></div></td>
-        </tr>`;
+        return `<tr><td>${label}</td><td style="font-weight:700;">${count}</td><td>${pct}%</td><td style="width:200px;"><div class="age-bar"><div class="age-fill" style="width:${pct}%;background:${ageColors[i]}"></div></div></td></tr>`;
     }).join('');
 
     // Stream analysis
@@ -729,17 +647,11 @@ function updateDashboard() {
         const disp = disposals.filter(d => d.stream === stream).length;
         const pend = total - disp;
         const pct = total > 0 ? ((pend / total) * 100).toFixed(1) : 0;
-        return `<tr>
-            <td><span class="stream-tag" style="background:${getStreamColor(stream)}20;color:${getStreamColor(stream)}">${stream}</span></td>
-            <td>${total}</td>
-            <td style="color:#e53e3e;font-weight:600;">${pend}</td>
-            <td style="color:#48bb78;font-weight:600;">${disp}</td>
-            <td>${pct}%</td>
-        </tr>`;
+        return `<tr><td><span class="stream-tag" style="background:${getStreamColor(stream)}20;color:${getStreamColor(stream)}">${stream}</span></td><td>${total}</td><td style="color:#e53e3e;">${pend}</td><td style="color:#48bb78;">${disp}</td><td>${pct}%</td></tr>`;
     }).join('');
 
     // Year analysis
-    const years = [...new Set(registrations.map(r => r.regYear))].sort((a, b) => b - a);
+    const years = [...new Set(registrations.map(r => r.regYear))].sort((a,b)=>b-a);
     const yearBody = document.getElementById('yearAnalysisBody');
     yearBody.innerHTML = years.map(year => {
         const total = registrations.filter(r => r.regYear === year).length;
@@ -749,13 +661,7 @@ function updateDashboard() {
         }).length;
         const pend = total - disp;
         const pct = total > 0 ? ((pend / total) * 100).toFixed(1) : 0;
-        return `<tr>
-            <td style="font-weight:600;">${year}</td>
-            <td>${total}</td>
-            <td style="color:#e53e3e;font-weight:600;">${pend}</td>
-            <td style="color:#48bb78;font-weight:600;">${disp}</td>
-            <td>${pct}%</td>
-        </tr>`;
+        return `<tr><td style="font-weight:600;">${year}</td><td>${total}</td><td style="color:#e53e3e;">${pend}</td><td style="color:#48bb78;">${disp}</td><td>${pct}%</td></tr>`;
     }).join('');
 }
 
@@ -763,41 +669,27 @@ function updateDashboard() {
 function handleTotalFilesUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = function(e) {
         const lines = e.target.result.split('\n');
         let imported = 0;
-
         lines.forEach((line, idx) => {
-            if (idx === 0 && (line.includes('S.No') || line.includes('RRCMS'))) return;
-            const parts = line.split(/[\t,]/).map(p => p.trim());
-            if (parts.length >= 4) {
+            if (idx===0 && (line.includes('S.No') || line.includes('RRCMS'))) return;
+            const parts = line.split(/[\t,]/).map(p=>p.trim());
+            if (parts.length>=4) {
                 const rrcms = parts[1] || parts[0];
                 const regDate = parts[2] || parts[1];
                 const stream = parts[3] || parts[2];
                 const year = parts[4] || new Date(regDate).getFullYear();
-
-                if (rrcms && regDate && !registrations.find(r => r.rrcms === rrcms)) {
+                if (rrcms && regDate && !registrations.find(r=>r.rrcms===rrcms)) {
                     try {
-                        const dateObj = new Date(regDate);
-                        const isoDate = dateObj.toISOString().split('T')[0];
-                        registrations.push({
-                            sno: registrations.length + 1,
-                            rrcms: rrcms,
-                            regDate: isoDate,
-                            stream: stream,
-                            regYear: parseInt(year) || new Date().getFullYear(),
-                            applicant: '',
-                            village: '',
-                            registeredOn: new Date().toISOString()
-                        });
+                        const isoDate = new Date(regDate).toISOString().split('T')[0];
+                        registrations.push({ sno: registrations.length+1, rrcms, regDate: isoDate, stream, regYear: parseInt(year), applicant:'', village:'', registeredOn: new Date().toISOString() });
                         imported++;
                     } catch(e) {}
                 }
             }
         });
-
         saveData();
         showToast(`Imported ${imported} files from Total Files data!`);
         refreshAll();
@@ -808,39 +700,26 @@ function handleTotalFilesUpload(event) {
 function handleDisposalUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = function(e) {
         const lines = e.target.result.split('\n');
         let imported = 0;
-
         lines.forEach((line, idx) => {
-            if (idx === 0 && (line.includes('RRCMS') || line.includes('Stream'))) return;
-            const parts = line.split(/[\t,]/).map(p => p.trim());
-            if (parts.length >= 2) {
+            if (idx===0 && (line.includes('RRCMS') || line.includes('Stream'))) return;
+            const parts = line.split(/[\t,]/).map(p=>p.trim());
+            if (parts.length>=2) {
                 const rrcms = parts[0];
-                const dispDate = parts[parts.length - 1];
-
-                const reg = registrations.find(r => r.rrcms === rrcms);
-                if (reg && !disposals.find(d => d.rrcms === rrcms)) {
+                const dispDate = parts[parts.length-1];
+                const reg = registrations.find(r=>r.rrcms===rrcms);
+                if (reg && !disposals.find(d=>d.rrcms===rrcms)) {
                     try {
-                        const dateObj = new Date(dispDate);
-                        const isoDate = dateObj.toISOString().split('T')[0];
-                        disposals.push({
-                            rrcms: rrcms,
-                            stream: reg.stream,
-                            regDate: reg.regDate,
-                            disposalDate: isoDate,
-                            disposalType: 'Decided',
-                            remarks: 'Imported from file',
-                            disposedOn: new Date().toISOString()
-                        });
+                        const isoDate = new Date(dispDate).toISOString().split('T')[0];
+                        disposals.push({ rrcms, stream: reg.stream, regDate: reg.regDate, disposalDate: isoDate, disposalType: 'Decided', remarks: 'Imported from file', disposedOn: new Date().toISOString() });
                         imported++;
                     } catch(e) {}
                 }
             }
         });
-
         saveData();
         showToast(`Imported ${imported} disposals!`);
         refreshAll();
@@ -858,8 +737,8 @@ function clearAllData() {
 }
 
 function exportAllData() {
-    const data = { registrations: registrations, disposals: disposals, exportedOn: new Date().toISOString() };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const data = { registrations, disposals, exportedOn: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -868,31 +747,37 @@ function exportAllData() {
     showToast('Backup exported successfully!');
 }
 
+// Force recalc pending - useful if counts are out of sync
+function forceRecalcPending() {
+    // Reload from localStorage to ensure we have latest
+    registrations = JSON.parse(localStorage.getItem('rccms_registrations')) || PRELOADED_REGISTRATIONS || [];
+    disposals = JSON.parse(localStorage.getItem('rccms_disposals')) || PRELOADED_DISPOSALS || [];
+    saveData();  // re-save to ensure consistency
+    refreshAll();
+    showToast('Pending files recalculated. Total pending: ' + (registrations.length - disposals.length));
+}
+
 // ===================== EDIT / DELETE =====================
 function editFile(rrcms) {
-    const file = registrations.find(r => r.rrcms === rrcms);
+    const file = registrations.find(r=>r.rrcms===rrcms);
     if (!file) return;
-
-    currentEditIndex = registrations.findIndex(r => r.rrcms === rrcms);
+    currentEditIndex = registrations.findIndex(r=>r.rrcms===rrcms);
     document.getElementById('editRRCMS').value = file.rrcms;
     document.getElementById('editDate').value = file.regDate;
     document.getElementById('editStream').value = file.stream;
     document.getElementById('editYear').value = file.regYear;
     document.getElementById('editApplicant').value = file.applicant || '';
     document.getElementById('editVillage').value = file.village || '';
-
     document.getElementById('editModal').classList.add('active');
 }
 
 function saveEdit() {
     if (currentEditIndex < 0) return;
-
     registrations[currentEditIndex].regDate = document.getElementById('editDate').value;
     registrations[currentEditIndex].stream = document.getElementById('editStream').value;
     registrations[currentEditIndex].regYear = parseInt(document.getElementById('editYear').value);
     registrations[currentEditIndex].applicant = document.getElementById('editApplicant').value;
     registrations[currentEditIndex].village = document.getElementById('editVillage').value;
-
     saveData();
     closeModal();
     showToast('File updated successfully!');
@@ -906,8 +791,8 @@ function closeModal() {
 
 function deleteFile(rrcms) {
     if (!confirm('Are you sure you want to delete this file?')) return;
-    registrations = registrations.filter(r => r.rrcms !== rrcms);
-    disposals = disposals.filter(d => d.rrcms !== rrcms);
+    registrations = registrations.filter(r=>r.rrcms!==rrcms);
+    disposals = disposals.filter(d=>d.rrcms!==rrcms);
     saveData();
     showToast('File deleted successfully!');
     refreshAll();
@@ -918,25 +803,16 @@ function formatDate(dateStr) {
     if (!dateStr) return '-';
     const d = new Date(dateStr);
     if (isNaN(d)) return dateStr;
-    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    return d.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
 }
 
 function getStreamColor(stream) {
-    const colors = { 
-        '188,53': '#3182ce', 
-        '212(02)': '#38a169', 
-        '188,88': '#d69e2e', 
-        '88': '#e53e3e', 
-        '188': '#805ad5', 
-        '136,188,88': '#dd6b20', 
-        '39(2)': '#38b2ac', 
-        'General': '#718096' 
-    };
+    const colors = { '188,53':'#3182ce', '212(02)':'#38a169', '188,88':'#d69e2e', '88':'#e53e3e', '188':'#805ad5', '136,188,88':'#dd6b20', '39(2)':'#38b2ac', 'General':'#718096' };
     return colors[stream] || '#718096';
 }
 
 function downloadCSV(csv, filename) {
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
