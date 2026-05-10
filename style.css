@@ -252,8 +252,8 @@ tr:hover { background: #f7fafc; }
 
 .file-upload:hover { border-color: #4299e1; background: #ebf8ff; }
 
-.mpr-table th { font-size: 0.78rem; white-space: nowrap; }
-.mpr-table td { font-size: 0.85rem; text-align: center; }
+.mpr-table th, .disposal-mpr-table th { font-size: 0.78rem; white-space: nowrap; }
+.mpr-table td, .disposal-mpr-table td { font-size: 0.85rem; text-align: center; }
 .mpr-table td:first-child, .mpr-table th:first-child { 
     text-align: left; 
     position: sticky; 
@@ -262,6 +262,8 @@ tr:hover { background: #f7fafc; }
     z-index: 2; 
 }
 .mpr-table td:first-child { background: white; font-weight: 600; }
+
+.disposal-detail-table th, .disposal-detail-table td { text-align: left; }
 
 .age-group-header { background: #edf2f7; font-weight: 700; text-align: center; }
 
