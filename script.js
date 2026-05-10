@@ -19,6 +19,12 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('mprFromDate').valueAsDate = firstDay;
     document.getElementById('mprToDate').valueAsDate = today;
 
+    // Set default dates for Disposal MPR (first day of current month to today)
+    const disposalMprFrom = document.getElementById('disposalMprFromDate');
+    const disposalMprTo = document.getElementById('disposalMprToDate');
+    if (disposalMprFrom) disposalMprFrom.valueAsDate = firstDay;
+    if (disposalMprTo) disposalMprTo.valueAsDate = today;
+
     // Show loaded data counts
     updateLoadedCounts();
 
@@ -533,6 +539,140 @@ function exportMPRCSV() {
 
     downloadCSV(csv, `MPR_Report_${fromDate}_to_${toDate}.csv`);
     showToast('MPR exported successfully!');
+}
+
+// ===================== DISPOSAL MPR (NEW) =====================
+function generateDisposalMPR() {
+    const fromDate = document.getElementById('disposalMprFromDate').value;
+    const toDate = document.getElementById('disposalMprToDate').value;
+
+    if (!fromDate || !toDate) {
+        showToast('Please select both From and To dates!', 'error');
+        return;
+    }
+
+    const from = new Date(fromDate);
+    const to = new Date(toDate);
+    to.setHours(23, 59, 59, 999);
+
+    // Filter disposals within date range
+    const filteredDisposals = disposals.filter(d => {
+        const dispDate = new Date(d.disposalDate);
+        return dispDate >= from && dispDate <= to;
+    });
+
+    if (filteredDisposals.length === 0) {
+        document.getElementById('disposalMprTableBody').innerHTML = `<tr><td colspan="10" class="empty-state">No disposals found in selected period</td></tr>`;
+        document.getElementById('disposalDetailBody').innerHTML = `<tr><td colspan="7" class="empty-state">No records</td></tr>`;
+        return;
+    }
+
+    // Calculate pending days for each disposal
+    const disposalsWithDays = filteredDisposals.map(d => {
+        const days = Math.ceil((new Date(d.disposalDate) - new Date(d.regDate)) / (1000 * 60 * 60 * 24));
+        let category = '';
+        if (days < 365) category = '<1 Year';
+        else if (days >= 365 && days < 730) category = '1-2 Years';
+        else if (days >= 730 && days < 1095) category = '2-3 Years';
+        else if (days >= 1095 && days < 1825) category = '3-5 Years';
+        else category = '≥5 Years';
+        return { ...d, pendingDays: days, category };
+    });
+
+    const total = disposalsWithDays.length;
+    const lessThan1Year = disposalsWithDays.filter(d => d.pendingDays < 365).length;
+    const oneToTwo = disposalsWithDays.filter(d => d.pendingDays >= 365 && d.pendingDays < 730).length;
+    const twoToThree = disposalsWithDays.filter(d => d.pendingDays >= 730 && d.pendingDays < 1095).length;
+    const threeToFive = disposalsWithDays.filter(d => d.pendingDays >= 1095 && d.pendingDays < 1825).length;
+    const overFive = disposalsWithDays.filter(d => d.pendingDays >= 1825).length;
+
+    const overOneYear = total - lessThan1Year;
+    const overTwoYears = total - (lessThan1Year + oneToTwo);
+    const overThreeYears = total - (lessThan1Year + oneToTwo + twoToThree);
+    const overFiveYears = overFive;
+
+    // Update summary table
+    const summaryBody = document.getElementById('disposalMprTableBody');
+    summaryBody.innerHTML = `<tr style="font-weight: bold; background: #f7fafc;">
+        <td>${total}</td>
+        <td>${lessThan1Year}</td>
+        <td>${oneToTwo}</td>
+        <td>${twoToThree}</td>
+        <td>${threeToFive}</td>
+        <td>${overFive}</td>
+        <td>${overOneYear}</td>
+        <td>${overTwoYears}</td>
+        <td>${overThreeYears}</td>
+        <td>${overFiveYears}</td>
+    </tr>`;
+
+    // Detailed list
+    const detailBody = document.getElementById('disposalDetailBody');
+    detailBody.innerHTML = disposalsWithDays.map((d, idx) => `
+        <tr>
+            <td>${idx + 1}</td>
+            <td>${d.rrcms}</td>
+            <td>${d.stream}</td>
+            <td>${formatDate(d.regDate)}</td>
+            <td>${formatDate(d.disposalDate)}</td>
+            <td>${d.pendingDays} days</td>
+            <td>${d.category}</td>
+        </tr>
+    `).join('');
+
+    showToast(`Disposal MPR generated: ${total} disposals found.`);
+}
+
+function exportDisposalMPRCSV() {
+    const fromDate = document.getElementById('disposalMprFromDate').value;
+    const toDate = document.getElementById('disposalMprToDate').value;
+    if (!fromDate || !toDate) {
+        showToast('Please generate report first!', 'error');
+        return;
+    }
+
+    // Fetch data from table (simpler to recompute)
+    const from = new Date(fromDate);
+    const to = new Date(toDate);
+    to.setHours(23, 59, 59, 999);
+    const filteredDisposals = disposals.filter(d => {
+        const dispDate = new Date(d.disposalDate);
+        return dispDate >= from && dispDate <= to;
+    });
+
+    const disposalsWithDays = filteredDisposals.map(d => {
+        const days = Math.ceil((new Date(d.disposalDate) - new Date(d.regDate)) / (1000 * 60 * 60 * 24));
+        let category = '';
+        if (days < 365) category = '<1 Year';
+        else if (days >= 365 && days < 730) category = '1-2 Years';
+        else if (days >= 730 && days < 1095) category = '2-3 Years';
+        else if (days >= 1095 && days < 1825) category = '3-5 Years';
+        else category = '≥5 Years';
+        return { ...d, pendingDays: days, category };
+    });
+
+    const total = disposalsWithDays.length;
+    const lessThan1Year = disposalsWithDays.filter(d => d.pendingDays < 365).length;
+    const oneToTwo = disposalsWithDays.filter(d => d.pendingDays >= 365 && d.pendingDays < 730).length;
+    const twoToThree = disposalsWithDays.filter(d => d.pendingDays >= 730 && d.pendingDays < 1095).length;
+    const threeToFive = disposalsWithDays.filter(d => d.pendingDays >= 1095 && d.pendingDays < 1825).length;
+    const overFive = disposalsWithDays.filter(d => d.pendingDays >= 1825).length;
+    const overOneYear = total - lessThan1Year;
+    const overTwoYears = total - (lessThan1Year + oneToTwo);
+    const overThreeYears = total - (lessThan1Year + oneToTwo + twoToThree);
+    const overFiveYears = overFive;
+
+    let csv = `Disposal MPR,${fromDate} to ${toDate}\n\n`;
+    csv += `Total Disposals,<1 Year,1-2 Years,2-3 Years,3-5 Years,≥5 Years,Over 1 Year,Over 2 Years,Over 3 Years,Over 5 Years\n`;
+    csv += `${total},${lessThan1Year},${oneToTwo},${twoToThree},${threeToFive},${overFive},${overOneYear},${overTwoYears},${overThreeYears},${overFiveYears}\n\n`;
+    csv += `Detailed Disposals List\n`;
+    csv += `S.No.,RRCMS No.,Stream,Reg Date,Disposal Date,Pending Days,Age Category\n`;
+    disposalsWithDays.forEach((d, idx) => {
+        csv += `${idx+1},${d.rrcms},${d.stream},${d.regDate},${d.disposalDate},${d.pendingDays},${d.category}\n`;
+    });
+
+    downloadCSV(csv, `Disposal_MPR_${fromDate}_to_${toDate}.csv`);
+    showToast('Disposal MPR exported successfully!');
 }
 
 // ===================== DASHBOARD =====================
