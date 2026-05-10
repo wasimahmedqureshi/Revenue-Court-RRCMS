@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RCCMS - Revenue Court Computerized Management System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>🏛️ RCCMS - Revenue Court Computerized Management System</h1>
+            <div class="subtitle">Assistant Collector (Fastrack), Niwai</div>
+        </div>
+        <div style="text-align: right;">
+            <div id="currentDate"></div>
+            <div style="font-size: 0.8rem; opacity: 0.7;">Government of Rajasthan</div>
+        </div>
+    </div>
+
+    <div class="nav-tabs">
+        <button class="nav-tab active" onclick="showTab('dashboard')">📊 Dashboard</button>
+        <button class="nav-tab" onclick="showTab('registration')">📝 File Registration</button>
+        <button class="nav-tab" onclick="showTab('disposal')">✅ File Disposal</button>
+        <button class="nav-tab" onclick="showTab('pending')">📋 Pending Files</button>
+        <button class="nav-tab" onclick="showTab('mpr')">📈 MPR Report</button>
+        <button class="nav-tab" onclick="showTab('import')">📥 Import/Export</button>
+    </div>
+
+    <div class="container">
+        <!-- DASHBOARD TAB -->
+        <div id="dashboard" class="tab-content active">
+            <div class="data-loaded">✅ Data Loaded: <span id="loadedReg">0</span> Registrations | <span id="loadedDisp">0</span> Disposals | <span id="loadedPending">0</span> Pending Files</div>
+            <div class="stats-grid">
+                <div class="stat-card blue">
+                    <div class="stat-value" id="totalFiles">0</div>
+                    <div class="stat-label">Total Registered Files</div>
+                </div>
+                <div class="stat-card green">
+                    <div class="stat-value" id="disposedFiles">0</div>
+                    <div class="stat-label">Total Disposed Files</div>
+                </div>
+                <div class="stat-card orange">
+                    <div class="stat-value" id="pendingFiles">0</div>
+                    <div class="stat-label">Total Pending Files</div>
+                </div>
+                <div class="stat-card red">
+                    <div class="stat-value" id="pendingOver5Yrs">0</div>
+                    <div class="stat-label">Pending Over 5 Years</div>
+                </div>
+                <div class="stat-card purple">
+                    <div class="stat-value" id="todayRegistered">0</div>
+                    <div class="stat-label">Registered Today</div>
+                </div>
+                <div class="stat-card teal">
+                    <div class="stat-value" id="todayDisposed">0</div>
+                    <div class="stat-label">Disposed Today</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📊 Pending Files by Age Analysis</div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr><th>Age Category</th><th>Count</th><th>Percentage</th><th>Visual</th></tr>
+                        </thead>
+                        <tbody id="ageAnalysisBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📈 Pending Files by Stream (Dhara)</div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr><th>Stream (Dhara)</th><th>Total</th><th>Pending</th><th>Disposed</th><th>Pending %</th></tr>
+                        </thead>
+                        <tbody id="streamAnalysisBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📅 Pending Files by Registration Year</div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr><th>Year</th><th>Total</th><th>Pending</th><th>Disposed</th><th>Pending %</th></tr>
+                        </thead>
+                        <tbody id="yearAnalysisBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- REGISTRATION TAB -->
+        <div id="registration" class="tab-content">
+            <div class="card">
+                <div class="card-title">📝 New File Registration</div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>RRCMS Number *</label>
+                        <input type="text" id="regRRCMS" placeholder="Enter RRCMS Number">
+                    </div>
+                    <div class="form-group">
+                        <label>Registration Date *</label>
+                        <input type="date" id="regDate">
+                    </div>
+                    <div class="form-group">
+                        <label>Stream (Dhara) *</label>
+                        <input type="text" id="regStream" placeholder="e.g. 188,53 or 212(02)">
+                    </div>
+                    <div class="form-group">
+                        <label>Registration Year *</label>
+                        <input type="number" id="regYear" placeholder="e.g. 2024" min="1950" max="2099">
+                    </div>
+                    <div class="form-group">
+                        <label>Applicant Name</label>
+                        <input type="text" id="regApplicant" placeholder="Enter Applicant Name">
+                    </div>
+                    <div class="form-group">
+                        <label>Village/Tehsil</label>
+                        <input type="text" id="regVillage" placeholder="Enter Village/Tehsil">
+                    </div>
+                </div>
+                <button class="btn btn-success" onclick="registerFile()">➕ Register File</button>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📋 All Registered Files</div>
+                <div class="search-bar no-print">
+                    <input type="text" id="regSearch" placeholder="Search by RRCMS No, Stream, or Applicant..." onkeyup="filterRegistrations()">
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>S.No.</th><th>RRCMS No.</th><th>Reg. Date</th><th>Stream (Dhara)</th><th>Reg. Year</th><th>Applicant</th><th>Village</th><th>Status</th><th class="no-print">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="registrationTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- DISPOSAL TAB -->
+        <div id="disposal" class="tab-content">
+            <div class="card">
+                <div class="card-title">✅ File Disposal</div>
+
+                <!-- Search Box for File Disposal -->
+                <div class="search-box-container" style="background: #ebf8ff; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #90cdf4;">
+                    <label style="font-weight: 600; color: #2c5282; margin-bottom: 8px; display: block;">🔍 Search File to Dispose</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="disposeSearch" placeholder="Type RRCMS No, Stream (Dhara), or Reg Year..." 
+                               style="flex: 1; padding: 12px 15px; border: 2px solid #4299e1; border-radius: 8px; font-size: 1rem;"
+                               oninput="searchFilesToDispose()" onkeydown="if(event.key==='Enter'){event.preventDefault();}">
+                        <button class="btn btn-primary" onclick="clearDisposeSearch()" style="white-space: nowrap;">❌ Clear</button>
+                    </div>
+                    <div id="searchResults" style="margin-top: 10px; max-height: 200px; overflow-y: auto; display: none;"></div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>RRCMS Number *</label>
+                        <select id="dispRRCMS" onchange="loadFileDetails()">
+                            <option value="">Select RRCMS Number</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Disposal Date *</label>
+                        <input type="date" id="dispDate">
+                    </div>
+                    <div class="form-group">
+                        <label>Disposal Type *</label>
+                        <select id="dispType">
+                            <option value="">Select Type</option>
+                            <option value="Decided">Decided</option>
+                            <option value="Rejected">Rejected</option>
+                            <option value="Withdrawn">Withdrawn</option>
+                            <option value="Transferred">Transferred</option>
+                            <option value="Settled">Settled</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Remarks</label>
+                        <input type="text" id="dispRemarks" placeholder="Enter Remarks">
+                    </div>
+                </div>
+                <div id="fileDetails" style="margin-bottom: 20px; padding: 15px; background: #f7fafc; border-radius: 8px; display: none;">
+                    <strong>File Details:</strong> <span id="fileDetailText"></span>
+                </div>
+                <button class="btn btn-success" onclick="disposeFile()">✅ Dispose File</button>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📋 Disposed Files List</div>
+                <div class="search-bar no-print">
+                    <input type="text" id="dispSearch" placeholder="Search by RRCMS No or Stream..." onkeyup="filterDisposals()">
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>S.No.</th><th>RRCMS No.</th><th>Stream (Dhara)</th><th>Reg. Date</th><th>Disposal Date</th><th>Disposal Type</th><th>Pending Days</th><th>Remarks</th><th class="no-print">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="disposalTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- PENDING FILES TAB -->
+        <div id="pending" class="tab-content">
+            <div class="card">
+                <div class="card-title">📋 Pending Files Report
+                    <button class="btn btn-primary export-btn no-print" onclick="exportPendingCSV()">📥 Export CSV</button>
+                    <button class="btn btn-warning export-btn no-print" onclick="window.print()" style="margin-right: 10px;">🖨️ Print</button>
+                </div>
+                <div class="filter-row no-print">
+                    <select id="pendingStreamFilter" onchange="filterPending()">
+                        <option value="">All Streams</option>
+                    </select>
+                    <select id="pendingYearFilter" onchange="filterPending()">
+                        <option value="">All Years</option>
+                    </select>
+                    <select id="pendingAgeFilter" onchange="filterPending()">
+                        <option value="">All Ages</option>
+                        <option value="0-180">Upto 6 Months</option>
+                        <option value="180-365">6 Months - 1 Year</option>
+                        <option value="365-730">1 - 2 Years</option>
+                        <option value="730-1095">2 - 3 Years</option>
+                        <option value="1095-1825">3 - 5 Years</option>
+                        <option value="1825-3650">5 - 10 Years</option>
+                        <option value="3650-7300">10 - 20 Years</option>
+                        <option value="7300-10950">20 - 30 Years</option>
+                        <option value="10950-14600">30 - 40 Years</option>
+                        <option value="14600+">More Than 40 Years</option>
+                    </select>
+                    <input type="text" id="pendingSearch" placeholder="Search RRCMS No..." onkeyup="filterPending()" style="padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 6px;">
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>S.No.</th><th>RRCMS No.</th><th>Reg. Date</th><th>Stream (Dhara)</th><th>Reg. Year</th><th>Pending Days</th><th>Age Category</th><th>Applicant</th><th>Village</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pendingTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- MPR REPORT TAB -->
+        <div id="mpr" class="tab-content">
+            <div class="card">
+                <div class="card-title">📈 Monthly Progress Report (MPR)
+                    <button class="btn btn-primary export-btn no-print" onclick="exportMPRCSV()">📥 Export MPR CSV</button>
+                    <button class="btn btn-warning export-btn no-print" onclick="window.print()" style="margin-right: 10px;">🖨️ Print</button>
+                </div>
+                <div class="filter-row no-print">
+                    <label>From Date:</label>
+                    <input type="date" id="mprFromDate">
+                    <label>To Date:</label>
+                    <input type="date" id="mprToDate">
+                    <button class="btn btn-primary" onclick="generateMPR()">Generate MPR</button>
+                </div>
+                <div class="table-container">
+                    <table class="mpr-table">
+                        <thead>
+                            <tr>
+                                <th rowspan="2">S.No.</th>
+                                <th rowspan="2">Office Name</th>
+                                <th rowspan="2">Initial Pending</th>
+                                <th rowspan="2">New Registered</th>
+                                <th rowspan="2">Total Decided</th>
+                                <th rowspan="2">Pending As On Date</th>
+                                <th colspan="10" class="age-group-header">Age-wise Pending Breakup</th>
+                            </tr>
+                            <tr>
+                                <th>Upto 6 Mo</th><th>6 Mo - 1 Yr</th><th>1 - 2 Yrs</th><th>2 - 3 Yrs</th><th>3 - 5 Yrs</th><th>5 - 10 Yrs</th><th>10 - 20 Yrs</th><th>20 - 30 Yrs</th><th>30 - 40 Yrs</th><th>> 40 Yrs</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mprTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- IMPORT TAB -->
+        <div id="import" class="tab-content">
+            <div class="card">
+                <div class="card-title">📥 Import / Export Data</div>
+                <p style="margin-bottom: 15px; color: #4a5568;">Upload additional text files or export current data:</p>
+
+                <div class="file-upload" onclick="document.getElementById('totalFilesInput').click()">
+                    <div style="font-size: 2rem;">📄</div>
+                    <div style="font-weight: 600; margin-top: 10px;">Click to Upload Total Files Data</div>
+                    <div style="font-size: 0.85rem; color: #718096; margin-top: 5px;">(Tab/Comma separated text file)</div>
+                    <input type="file" id="totalFilesInput" accept=".txt,.csv" style="display: none;" onchange="handleTotalFilesUpload(event)">
+                </div>
+
+                <div class="file-upload" onclick="document.getElementById('disposalInput').click()">
+                    <div style="font-size: 2rem;">📄</div>
+                    <div style="font-weight: 600; margin-top: 10px;">Click to Upload Disposal Data</div>
+                    <div style="font-size: 0.85rem; color: #718096; margin-top: 5px;">(Tab/Comma separated text file)</div>
+                    <input type="file" id="disposalInput" accept=".txt,.csv" style="display: none;" onchange="handleDisposalUpload(event)">
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-danger" onclick="clearAllData()">🗑️ Clear All Data</button>
+                    <button class="btn btn-primary" onclick="exportAllData()" style="margin-left: 10px;">💾 Export All Data (Backup)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <h3>✏️ Edit File</h3>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>RRCMS Number</label>
+                    <input type="text" id="editRRCMS" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Registration Date</label>
+                    <input type="date" id="editDate">
+                </div>
+                <div class="form-group">
+                    <label>Stream (Dhara)</label>
+                    <input type="text" id="editStream">
+                </div>
+                <div class="form-group">
+                    <label>Registration Year</label>
+                    <input type="number" id="editYear">
+                </div>
+                <div class="form-group">
+                    <label>Applicant Name</label>
+                    <input type="text" id="editApplicant">
+                </div>
+                <div class="form-group">
+                    <label>Village/Tehsil</label>
+                    <input type="text" id="editVillage">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
